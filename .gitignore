@@ -1,0 +1,7 @@
+data
+cacheFolder
+cacheFolder.tar.gz
+createJSON2.py
+ProjectionTransfer.py
+.data
+*.pyc
