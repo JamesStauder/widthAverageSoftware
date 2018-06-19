@@ -410,13 +410,13 @@ class MainWindow(QMainWindow):
         x1, y1 = self.flowlineMarkers[0][0].cx, self.flowlineMarkers[0][0].cy
         x2, y2 = self.flowlineMarkers[1][0].cx, self.flowlineMarkers[1][0].cy
 
-        numbersToTest = range(20, 100)
+        numbersToTest = range(20, 100, 5)
 
 
-        '''
+
         trueVolume = self.calcTrueVolume()
         print trueVolume
-        '''
+
         for numberOfLines in numbersToTest:
             self.flowlines = self.flowlines[0:2]
             dx = (x2 - x1) / (numberOfLines + 1)
@@ -453,7 +453,6 @@ class MainWindow(QMainWindow):
         print "Profile creation took :", time.time() - t0
         print oldVolumes
         print newVolumes
-        #print trueVolume
 
         plt.plot(oldVolumes, label='Old bad way', color='red')
         plt.plot(newVolumes, label='Jimmys awesome way', color='blue')
@@ -545,24 +544,38 @@ class MainWindow(QMainWindow):
         newMethodVolume = 0
         oldMethodVolume = 0
 
+        thicknessList = []
+        widthList = []
         for i in range(len(self.flowlines)):
+
+            tempList = []
             for j in range(len(self.flowlines[0])):
-                self.flowlines[i][j].append(self.datasetDict['thickness'].getInterpolatedValue(self.flowlines[i][j][0], self.flowlines[i][j][1])[0][0]
-                                            )
+                tempList.append(self.datasetDict['thickness'].getInterpolatedValue(self.flowlines[i][j][0], self.flowlines[i][j][1])[0][0])
 
 
-        myFlowlines = np.asarray(self.flowlines)
-        myFlowlines = np.rot90(myFlowlines,k=3)
-
-        
+            thicknessList.append(tempList)
 
 
+        for i in range(len(self.flowlines[0])):
+            shearPoints = [[self.flowlines[0][i][0], self.flowlines[0][i][1]],
+                           [self.flowlines[1][i][0], self.flowlines[1][i][1]]]
 
+            totalWidth = sqrt(
+                (shearPoints[0][0] - shearPoints[1][0]) ** 2 + (shearPoints[0][1] - shearPoints[1][1]) ** 2)
+            widthList.append(totalWidth)
+        thicknessList = np.asarray(thicknessList)
+        thicknessList = np.rot90(thicknessList, k=3)
+        avgThicknessList = np.mean(thicknessList, axis=1)
+        widthList = np.asarray(widthList)
+
+
+        newMethodVolume = sum(
+            ((avgThicknessList[:-1] * widthList[:1]) + (avgThicknessList[1:] * widthList[1:]))/2 * float(self.spatialResolutionLineEdit.text())
+        )
 
 
 
         averageThicknessList = []
-        widthList = []
 
         for i in range(0, len(self.flowlines[0])):
 
@@ -573,8 +586,7 @@ class MainWindow(QMainWindow):
             dx = (shearPoints[1][0] - shearPoints[0][0]) / (len(self.flowlines) - 1)
             dy = (shearPoints[1][1] - shearPoints[0][1]) / (len(self.flowlines) - 1)
 
-            totalWidth = sqrt(
-                (shearPoints[0][0] - shearPoints[1][0]) ** 2 + (shearPoints[0][1] - shearPoints[1][1]) ** 2)
+
             currPoint = shearPoints[0]
 
             for j in range(0, len(self.flowlines)):
@@ -584,7 +596,6 @@ class MainWindow(QMainWindow):
                 currPoint[0] = currPoint[0] + dx
                 currPoint[1] = currPoint[1] + dy
 
-            widthList.append(totalWidth)
             averageThicknessList.append((totalThickness / len(self.flowlines)))
 
         for i in range(0, len(averageThicknessList) - 1):
