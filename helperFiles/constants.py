@@ -25,6 +25,7 @@ pinkPlotPen = pg.mkPen(color=(153, 0, 153), width=2)
 brownPlotPen = pg.mkPen(color=(92, 64, 51), width=2)
 
 dataFileName = './data/GreenlandInBedCoord_V2.h5'
+fullDataFileName = './data/AllDataSets0.h5'
 cmFileName = './data/dataCMValues_V2.h5'
 
 dt_float = 5.0  # Time step

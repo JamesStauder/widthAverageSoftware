@@ -8,6 +8,9 @@ from ModelGUI import *
 from ..caching.cachingFunctions import *
 import time
 import matplotlib.pyplot as plt
+from matplotlib.path import Path
+import matplotlib.patches as mpatches
+import matplotlib.patches as patches
 from scipy.spatial import ConvexHull
 from scipy.spatial import Delaunay
 from decimal import Decimal
@@ -410,12 +413,13 @@ class MainWindow(QMainWindow):
         x1, y1 = self.flowlineMarkers[0][0].cx, self.flowlineMarkers[0][0].cy
         x2, y2 = self.flowlineMarkers[1][0].cx, self.flowlineMarkers[1][0].cy
 
-        numbersToTest = range(20, 100, 5)
+        numbersToTest = range(1, 50, 2)
 
 
-
+        timeTrue = time.time()
+        print "calculating true volume"
         trueVolume = self.calcTrueVolume()
-        print trueVolume
+        print "calculated true volume in time: ", time.time() - timeTrue
 
         for numberOfLines in numbersToTest:
             self.flowlines = self.flowlines[0:2]
@@ -453,14 +457,20 @@ class MainWindow(QMainWindow):
         print "Profile creation took :", time.time() - t0
         print oldVolumes
         print newVolumes
+        print trueVolume
 
-        plt.plot(oldVolumes, label='Old bad way', color='red')
-        plt.plot(newVolumes, label='Jimmys awesome way', color='blue')
-        # plt.plot(trueVolume, label='True Volume?', color='black')
+
+        horizLineData = np.array([trueVolume for i in numbersToTest])
+        plt.plot(numbersToTest,oldVolumes, label='Old bad way', color='red')
+        plt.plot(numbersToTest,newVolumes, label='Jimmys awesome way', color='blue')
+        plt.plot(numbersToTest, horizLineData, label='True Volume?', color='black')
         plt.legend()
         plt.show()
 
     def calcTrueVolume(self):
+
+
+        '''
         trueVolume = 0
         resolution = 50
 
@@ -492,6 +502,7 @@ class MainWindow(QMainWindow):
                 # Really confusing way to make a quadrilateral set of points to calculate the volume
                 points = []
 
+
                 points.append([line1Values[j][0], line1Values[j][1],
                                self.datasetDict['surface'].getInterpolatedValue(line1Values[j][0], line1Values[j][1])[0][
                                    0] -
@@ -509,6 +520,8 @@ class MainWindow(QMainWindow):
                 points.append([line1Values[j + 1][0], line1Values[j + 1][1],
                                self.datasetDict['surface'].getInterpolatedValue(line1Values[j + 1][0],
                                                                                 line1Values[j + 1][1])[0][0]])
+
+
 
                 points.append([line2Values[j][0], line2Values[j][1],
                                self.datasetDict['surface'].getInterpolatedValue(line2Values[j][0], line2Values[j][1])[0][
@@ -535,48 +548,169 @@ class MainWindow(QMainWindow):
 
                 trueVolume = trueVolume + np.sum(self.tetrahedron_volume(tets[:, 0], tets[:, 1],
                                                                          tets[:, 2], tets[:, 3]))
+        testVolume = trueVolume
+        '''
+
+
+
+        shear1 = np.asarray(self.flowlines[0])
+        shear2 = np.asarray(self.flowlines[1])
+
+
+        myShears = []
+        myShears.extend(shear1)
+        myShears.extend(list(reversed(shear2)))
+        myShears.append(shear1[0])
+        myShears = np.asarray(myShears)
+
+
+        myPath = Path(myShears, closed=True)
+
+
+
+
+        maxY, minY = max(myShears[:,1]), min(myShears[:,1])
+        minY = minY - 150  #buffer
+        maxY = maxY + 150 #buffer
+
+
+
+        maxX, minX = max(myShears[:,0]), min(myShears[:,0])
+        maxX = maxX + 150
+        minX = minX - 150
+
+
+        allDataFile = h5py.File(fullDataFileName, 'r')
+
+        xs = allDataFile['x'][:]
+        ys = allDataFile['y'][:]
+
+        thickness = allDataFile['thickness'][:]
+
+        xx, yy = np.meshgrid(xs, ys)
+        XY = np.dstack((xx,yy))
+        XYFlat = XY.reshape(-1, 2)
+
+        thicknessFlat = thickness.reshape(-1)
+
+
+
+
+
+        dataMaxY = XYFlat[0][1]
+        dataMinY = XYFlat[-1][1]
+
+
+        YToCutMax = abs(dataMaxY - maxY)/150
+        YToCutMin = abs(dataMinY - minY)/150
+
+        numX = 10018
+        samplePoints = XYFlat[int(math.floor(YToCutMax)*numX):-(int(math.floor(YToCutMin) * numX))]
+        thicknessFlat = thicknessFlat[int(math.floor(YToCutMax)*numX):-(int(math.floor(YToCutMin) * numX))]
+
+
+
+        newSamplePoints = []
+        newThickness = []
+        for i in range(numX):
+            newSamplePoints.extend(samplePoints[i::numX])
+            newThickness.extend(thicknessFlat[i::numX])
+
+        newSamplePoints = np.asarray(newSamplePoints)
+        newThickness = np.asarray(newThickness)
+
+
+
+
+
+        dataMaxX = newSamplePoints[-1][0]
+        dataMinX = newSamplePoints[0][0]
+
+
+        XToCutMax = int(math.floor(abs(dataMaxX - maxX)/150))
+        XToCutMin = int(math.floor(abs(dataMinX - minX)/150))
+
+        newMaxY, newMinY = newSamplePoints[0][1], newSamplePoints[-1][1]
+
+        numY = int(abs(newMaxY - newMinY)/150) +1
+
+
+
+
+
+
+
+
+
+
+        finalSamplePoints = newSamplePoints[XToCutMin*numY:-(XToCutMax*numY)]
+        finalThicknessPoints = newThickness[XToCutMin*numY:-(XToCutMax*numY)]
+
+
+
+
+        thicknessValuesInShape = []
+
+
+
+        pointsInShape = []
+
+        time0 = time.time()
+        for i in range(len(finalSamplePoints)):
+
+            point = [int(finalSamplePoints[i][0]), int(finalSamplePoints[i][1])]
+
+            if myPath.contains_point(point):
+                thicknessValuesInShape.append(finalThicknessPoints[i])
+                pointsInShape.append(point)
+
+        '''
+        pointsInShape = np.asarray(pointsInShape)
+        plt.scatter(finalSamplePoints[:,0], finalSamplePoints[:,1],1, color='red')
+        plt.scatter(pointsInShape[:,0], pointsInShape[:,1],1, color='green')
+        plt.plot(myShears[:,0], myShears[:,1], color='blue')
+        plt.show()
+        print testVolume
+        print trueVolume
+        '''
+
+        trueVolume = sum(thicknessValuesInShape) * 150**2
+
         return trueVolume
+
+
 
     def tetrahedron_volume(self, a, b, c, d):
         return np.abs(np.einsum('ij,ij->i', a - d, np.cross(b - d, c - d))) / 6
 
+
+    def getWidths(self):
+
+        shear1 = np.asarray(self.flowlines[0])
+        shear2 = np.asarray(self.flowlines[1])
+
+        width = sqrt((shear1[:,0] - shear2[:,0])**2 + (shear1[:,1] - shear2[:,1])**2)
+        return np.asarray(width)
+
     def calcVolume(self):
-        newMethodVolume = 0
-        oldMethodVolume = 0
+
+        widthList = self.getWidths()
 
         thicknessList = []
-        widthList = []
-        for i in range(len(self.flowlines)):
-
-            tempList = []
-            for j in range(len(self.flowlines[0])):
-                tempList.append(self.datasetDict['thickness'].getInterpolatedValue(self.flowlines[i][j][0], self.flowlines[i][j][1])[0][0])
-
-
-            thicknessList.append(tempList)
-
-
-        for i in range(len(self.flowlines[0])):
-            shearPoints = [[self.flowlines[0][i][0], self.flowlines[0][i][1]],
-                           [self.flowlines[1][i][0], self.flowlines[1][i][1]]]
-
-            totalWidth = sqrt(
-                (shearPoints[0][0] - shearPoints[1][0]) ** 2 + (shearPoints[0][1] - shearPoints[1][1]) ** 2)
-            widthList.append(totalWidth)
+        for step in range(0, len(self.flowlines[0])):
+            Thickness = []
+            for sample in range(2, len(self.flowlines)):
+                samplePoint = self.flowlines[sample][step]
+                Thickness.append(self.datasetDict['thickness'].getInterpolatedValue(samplePoint[0], samplePoint[1])[0][0])
+            thicknessList.append(np.mean(np.asarray(Thickness)))
         thicknessList = np.asarray(thicknessList)
-        thicknessList = np.rot90(thicknessList, k=3)
-        avgThicknessList = np.mean(thicknessList, axis=1)
-        widthList = np.asarray(widthList)
-
 
         newMethodVolume = sum(
-            ((avgThicknessList[:-1] * widthList[:1]) + (avgThicknessList[1:] * widthList[1:]))/2 * float(self.spatialResolutionLineEdit.text())
-        )
+            (thicknessList[:] * widthList[:]) * float(self.spatialResolutionLineEdit.text()))
 
 
 
-        averageThicknessList = []
-
+        avgThicknessList = []
         for i in range(0, len(self.flowlines[0])):
 
             totalThickness = 0
@@ -596,13 +730,11 @@ class MainWindow(QMainWindow):
                 currPoint[0] = currPoint[0] + dx
                 currPoint[1] = currPoint[1] + dy
 
-            averageThicknessList.append((totalThickness / len(self.flowlines)))
+            avgThicknessList.append((totalThickness / len(self.flowlines)))
 
-        for i in range(0, len(averageThicknessList) - 1):
-            oldMethodVolume = oldMethodVolume + \
-                              (((averageThicknessList[i] * widthList[i]) + (
-                                  averageThicknessList[i + 1] * widthList[i + 1])) / 2
-                               * float(self.spatialResolutionLineEdit.text()))
+        oldMethodVolume = sum(
+
+            (avgThicknessList[:] * widthList[:]) * float(self.spatialResolutionLineEdit.text()))
 
         return oldMethodVolume, newMethodVolume
 
