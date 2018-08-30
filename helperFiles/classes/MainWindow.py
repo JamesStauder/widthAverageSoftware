@@ -389,24 +389,66 @@ class MainWindow(QMainWindow):
                     [self.whichMarkerSelected.lines[0].getData()[0][0], self.whichMarkerSelected.cx],
                     [self.whichMarkerSelected.lines[0].getData()[1][0], self.whichMarkerSelected.cy])
 
+
+    def calcFlux(self):
+
+        self.vxInterp = Dataset('VX')
+        self.vyInterp = Dataset('VY')
+
+        trueFlux = self.calcTrueFlux()
+        midFlux = self.calcMidFlux()
+        sampleFlux = self.calcSampleFlux()
+        naiveFlux = self.calcNaiveFlux()
+
+    def calcTrueFlux(self):
+
+        shear1 = self.flowlines[0]
+        shear2 = self.flowlines[1]
+        trueFlux = []
+        widthList = self.getWidths()
+
+
+
+        for point in range(len(shear1)):
+
+            slope = (shear2[point][1]-shear1[point][1])/(shear2[point][0]-shear1[point][0])
+
+
+            deltaX = 1000
+            numPoints = math.ceil(widthList[point] /deltaX)
+            xValues = linspace(shear1[point][0], shear2[point][0], numPoints)
+            yValues = linspace(shear1[point][1], shear2[point][1], numPoints)
+
+            vxValues = []
+            vyValues = []
+            vmagValues = []
+            for sample in range(len(xValues)):
+                vxValues.append(self.vxInterp.getInterpolatedValue(xValues[sample], yValues[sample])[0][0])
+                vyValues.append(self.vyInterp.getInterpolatedValue(xValues[sample], yValues[sample])[0][0])
+            vxValues = np.asarray(vxValues)
+            vyValues = np.asarray(vyValues)
+            vmagValues= sqrt(vxValues**2 + vyValues**2)
+
+
+
+
+            fluxValues = []
+
+            sys.exit()
+            trueFlux.append(sum(fluxValues))
+        return trueFlux
     '''
-    Function: calcVelocityWidth
-    Argument list: 
-    Purpose: 
-        Calculates velocity width by connecting the ith marker of each shear margin. This displays lines between
-        each displayed marker as well. This also does an averaging scheme where we create lines between the two shear
-        margins starting at the terminus. The number of lines is determined by numberOfLines. The averaging is done
-        by averaging the ith index of each line together.
-        TODO: Reference paper when written
-    Return types, values: 
-    Dependencies: Two selected shear margins. This is susceptible to user errors. TODO: Fix the errors
-    Creator: James Stauder
-    Date created: 2/25/18
-    Last edited: 3/9/18
+    def calcMidFlux(self):
+
+    def calcSampleFlux(self):
+
+    def calcNaiveFlux(self):
     '''
 
     def calcVelocityWidth(self):
         t0 = time.time()
+
+        self.calcFlux()
 
         self.flowlines = self.flowlines[0:2]
         midValues, naiveValues, sampleValues = self.createThreeProfiles()
